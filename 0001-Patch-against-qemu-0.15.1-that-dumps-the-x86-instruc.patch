@@ -1,0 +1,32 @@
+From abda6455d7bb6a5dee678874b1c2459453f89106 Mon Sep 17 00:00:00 2001
+From: Rodrigo Rodrigues da Silva <pitanga@members.fsf.org>
+Date: Sat, 29 Oct 2011 04:11:14 -0700
+Subject: [PATCH] Patch against qemu 0.15.1 that dumps the x86 instruction pointer to stdout
+
+---
+ cpus.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/cpus.c b/cpus.c
+index 6bf4e3f..8a8b244 100644
+--- a/cpus.c
++++ b/cpus.c
+@@ -1089,6 +1089,15 @@ bool cpu_exec_all(void)
+     for (; next_cpu != NULL && !exit_request; next_cpu = next_cpu->next_cpu) {
+         CPUState *env = next_cpu;
+ 
++#ifdef TARGET_I386
++        CPUX86State *env_x86 = (CPUX86State*)env;
++        uint32_t pc = (uint32_t)env_x86->segs[R_CS].base + env_x86->eip;
++        //fprintf(stderr, "qemu: PC: 0x%08lx\n", pc);
++        //fflush(stderr);
++        write(1,&pc,sizeof(pc));
++        fflush(stdout);
++#endif
++
+         qemu_clock_enable(vm_clock,
+                           (env->singlestep_enabled & SSTEP_NOTIMER) == 0);
+ 
+-- 
+1.7.1
+
