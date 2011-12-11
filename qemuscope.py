@@ -50,8 +50,21 @@ def high18linear ( word ):
 
 @appendTo( MAPPINGS )
 def high18block ( word ):
-    value = word & (2 ** 18 - 1) # low 18
-    value = word >> 18
+    value = word >> 14
+    colWidth, colHeight = 16, 16
+    columns = 32
+    colX = value % colWidth
+    colY = value / colWidth
+    colN = colY / colHeight
+    colXX = colN % columns
+    colYY = colN / columns
+    X = colX + (colWidth * colXX)
+    Y = colY % colHeight + (colHeight * colYY)
+    return X, Y
+
+@appendTo( MAPPINGS )
+def low18block ( word ):
+    value = word & (2 ** 14 - 1) # low 18
     colWidth, colHeight = 16, 16
     columns = 32
     colX = value % colWidth
@@ -67,7 +80,7 @@ def high18block ( word ):
 def main ( mapFn ):
     #line defs
     SIZE         = (512,512)
-    FADE_RATE    = 0
+    FADE_RATE    = 1
     LINECOLOR    = ( 0, 255, 0, 10 )
     BACKGROUND   = ( 0, 0, 0, FADE_RATE )
 
@@ -156,6 +169,16 @@ def main ( mapFn ):
 
         pygame.display.flip()
 
+
 if __name__ == "__main__":
-    mapFn = globals().get( sys.argv[1] )
-    main( mapFn )
+    try:
+        mapFn = globals()[ sys.argv[1] ]
+
+    except:
+        print "usage: %s <%s>" % (
+            sys.argv[0], 
+            "|".join( k for k,v in globals().items() if v in MAPPINGS )
+            )
+    else:
+        main( mapFn )
+
