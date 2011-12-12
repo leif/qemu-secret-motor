@@ -19,6 +19,7 @@ import pygame
 import os
 import sys
 import math
+import time
 
 
 MAPPINGS = []
@@ -39,7 +40,7 @@ def mid18linear ( word ):
 @appendTo( MAPPINGS )
 def low18linear ( word ):
     x = word & 511
-    y = word >> 9 & 511
+    y = (word >> 9) & 511
     return x, y
 
 @appendTo( MAPPINGS )
@@ -64,7 +65,7 @@ def high18block ( word ):
 
 @appendTo( MAPPINGS )
 def low18block ( word ):
-    value = word & (2 ** 14 - 1) # low 18
+    value = word & (2 ** 18 - 1)
     colWidth, colHeight = 16, 16
     columns = 32
     colX = value % colWidth
@@ -77,26 +78,26 @@ def low18block ( word ):
     return X, Y
 
 @appendTo( MAPPINGS )
-def high18hilbert( word, n=128 ):
+def low18hilbert( word, n=128 ):
     """
     Attempt at porting C code from wikipedia. Doesn't work right.
     """
-    t = word & (2 ** 14 - 1) # low 18
+    t = word & (2 ** 18 - 1) # low 18
     x = y = 0
     s = 1
     while s<n:
         s*=2
-        rx = 1 & (t/2);
-        ry = 1 & (t ^ rx);
+        rx = 1 & (t/2)
+        ry = 1 & (t ^ rx)
         if ry == 0:
             if rx == 1:
-                x = n-1 - x;
-                y = n-1 - y;
+                x = n-1 - x
+                y = n-1 - y
             x, y = y, x
-        x += s * rx;
-        y += s * ry;
-        t /= 4;
-    return 4*(x%n), 4*(y%n)
+        x += s * rx
+        y += s * ry
+        t /= 4
+    return 4*(x), 4*(y)
    
 def main ( mapFn ):
     #line defs
@@ -141,34 +142,20 @@ def main ( mapFn ):
     dot.fill(DOT2COLOR, pygame.Rect(2,3,3,1))
     dot.fill(DOT1COLOR, pygame.Rect(3,3,1,1))
 
-    grid = pygame.Surface(SIZE)
-    grid.set_alpha(ALPHA)
-    grid.fill(BGCOLOR)
-
-    for x in range(10):
-        pygame.draw.line(grid, GRIDCOLOR, (x*SIZE[0]/10,0), (x*SIZE[0]/10,SIZE[0]))
-
-    for y in range(8):
-        pygame.draw.line(grid, GRIDCOLOR, (0 , y*SIZE[1]/8), (SIZE[0] , y*SIZE[1]/8))
-
-    pygame.draw.line(grid, GRIDCOLOR, (SIZE[0]/2,0), (SIZE[0]/2,SIZE[0]), 3)
-    pygame.draw.line(grid, GRIDCOLOR, (0 , SIZE[1]/2), (SIZE[0] , SIZE[1]/2), 3)
-
-    for x in range(100):
-        pygame.draw.line(grid, GRIDCOLOR, (x*SIZE[0]/100,SIZE[1]/2-3), (x*SIZE[0]/100,SIZE[1]/2+3))
-
-    for y in range(80):
-        pygame.draw.line(grid, GRIDCOLOR, (SIZE[0]/2 - 3, y*SIZE[1]/80), (SIZE[0]/2 + 3, y*SIZE[1]/80))
-
     stdin = os.fdopen( sys.stdin.fileno(), 'r', 0 )
     stdinIter = iter( lambda: stdin.read(4), '' )
     coords = None
 
     count = 0
+
+    lastTime = time.time()
+
     for wordBytes in stdinIter:
         count+=1
         if count % 1000 == 0:
-            print count
+            now = time.time()
+            print "%s per second" % (1000 / (now - lastTime),)
+            lastTime = now
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
 
@@ -178,9 +165,6 @@ def main ( mapFn ):
 
         oldCoords = coords    
         coords    = (x, y)
-        
-        #print oldCoords
-        #print coords
         
         if oldCoords != None:
             pygame.draw.line( image, LINECOLOR, coords, oldCoords )
