@@ -30,41 +30,14 @@ def appendTo ( target ):
         return fn
     return decorator
 
-
 @appendTo( MAPPINGS )
-def mid18linear ( word ):
-    x = (word >> 3) & 511
-    y = (word >> 9) & 511
-    return x, y
-
-@appendTo( MAPPINGS )
-def low18linear ( word ):
+def linear ( word ):
     x = word & 511
     y = (word >> 9) & 511
     return x, y
 
 @appendTo( MAPPINGS )
-def high18linear ( word ):
-    x = (word >> 14) & 511
-    y = (word >> 23)  & 511
-    return x, y
-
-@appendTo( MAPPINGS )
-def high18block ( word ):
-    value = word >> 14
-    colWidth, colHeight = 16, 16
-    columns = 32
-    colX = value % colWidth
-    colY = value / colWidth
-    colN = colY / colHeight
-    colXX = colN % columns
-    colYY = colN / columns
-    X = colX + (colWidth * colXX)
-    Y = colY % colHeight + (colHeight * colYY)
-    return X, Y
-
-@appendTo( MAPPINGS )
-def low18block ( word ):
+def block ( word ):
     value = word & (2 ** 18 - 1)
     colWidth, colHeight = 16, 16
     columns = 32
@@ -78,11 +51,10 @@ def low18block ( word ):
     return X, Y
 
 @appendTo( MAPPINGS )
-def low18hilbert( word, n=128 ):
+def hilbert( t, n=128 ):
     """
     Attempt at porting C code from wikipedia. Doesn't work right.
     """
-    t = word & (2 ** 18 - 1) # low 18
     x = y = 0
     s = 1
     while s<n:
@@ -97,17 +69,16 @@ def low18hilbert( word, n=128 ):
         x += s * rx
         y += s * ry
         t /= 4
-    return 4*(x), 4*(y)
-   
+    return 4*x, 4*y
+
 def main ( mapFn ):
     #line defs
-    SIZE         = (512,512)
     FADE_RATE    = 1
     LINECOLOR    = ( 0, 255, 0, 10 )
     BACKGROUND   = ( 0, 0, 0, FADE_RATE )
 
     #point defs
-    SIZE = (512,512)
+    SIZE      = (1024,512)
     DOT1COLOR = (63,255,191)
     DOT2COLOR = (15,127,47)
     DOT3COLOR = (11,95,35)
@@ -124,7 +95,6 @@ def main ( mapFn ):
 
     screen = pygame.display.set_mode(SIZE,pygame.HWSURFACE|pygame.ASYNCBLIT)
     pygame.display.set_caption('YouScope XY-Demo Osciloscope Emulator')
-    pygame.mouse.set_visible(0)
 
     image = pygame.Surface( SIZE, pygame.SRCALPHA )
 
@@ -144,7 +114,8 @@ def main ( mapFn ):
 
     stdin = os.fdopen( sys.stdin.fileno(), 'r', 0 )
     stdinIter = iter( lambda: stdin.read(4), '' )
-    coords = None
+    highCoords = None
+    lowCoords  = None
 
     count = 0
 
@@ -157,17 +128,32 @@ def main ( mapFn ):
             print "%s per second" % (1000 / (now - lastTime),)
             lastTime = now
         for event in pygame.event.get():
-            if event.type == pygame.QUIT: sys.exit()
+            if event.type == pygame.QUIT:
+                sys.exit()
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                print pygame.mouse.get_pos()
 
         word = struct.unpack( 'I', wordBytes )[0]
 
-        x, y = mapFn( word )
+        highWord = word >> 14
+        x, y = mapFn( highWord )
 
-        oldCoords = coords    
-        coords    = (x, y)
+        oldHighCoords = highCoords
+        highCoords    = (x, y)
+
+        if oldHighCoords != None:
+            pygame.draw.line( image, LINECOLOR, highCoords, oldHighCoords )
+            screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
+
+        lowWord  = word & ( 2 ** 18 - 1 )
+        x, y = mapFn( lowWord )
+        x += 512
+
+        oldLowCoords = lowCoords
+        lowCoords    = (x, y)
         
-        if oldCoords != None:
-            pygame.draw.line( image, LINECOLOR, coords, oldCoords )
+        if oldLowCoords != None:
+            pygame.draw.line( image, LINECOLOR, lowCoords, oldLowCoords )
             screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
 
         screen.blit( image, (0,0) )
