@@ -75,7 +75,28 @@ def low18block ( word ):
     X = colX + (colWidth * colXX)
     Y = colY % colHeight + (colHeight * colYY)
     return X, Y
-    
+
+@appendTo( MAPPINGS )
+def high18hilbert( word, n=128 ):
+    """
+    Attempt at porting C code from wikipedia. Doesn't work right.
+    """
+    t = word & (2 ** 14 - 1) # low 18
+    x = y = 0
+    s = 1
+    while s<n:
+        s*=2
+        rx = 1 & (t/2);
+        ry = 1 & (t ^ rx);
+        if ry == 0:
+            if rx == 1:
+                x = n-1 - x;
+                y = n-1 - y;
+            x, y = y, x
+        x += s * rx;
+        y += s * ry;
+        t /= 4;
+    return 4*(x%n), 4*(y%n)
    
 def main ( mapFn ):
     #line defs
@@ -143,9 +164,11 @@ def main ( mapFn ):
     stdinIter = iter( lambda: stdin.read(4), '' )
     coords = None
 
-
+    count = 0
     for wordBytes in stdinIter:
-        
+        count+=1
+        if count % 1000 == 0:
+            print count
         for event in pygame.event.get():
             if event.type == pygame.QUIT: sys.exit()
 
