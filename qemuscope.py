@@ -32,15 +32,15 @@ def appendTo ( target ):
 
 @appendTo( MAPPINGS )
 def linear ( word ):
-    x = word & 511
-    y = (word >> 9) & 511
+    x = word & 255
+    y = (word >> 8) & 255
     return x, y
 
 @appendTo( MAPPINGS )
 def block ( word ):
-    value = word & (2 ** 18 - 1)
+    value = word & (2 ** 16 - 1)
     colWidth, colHeight = 16, 16
-    columns = 32
+    columns = 16
     colX = value % colWidth
     colY = value / colWidth
     colN = colY / colHeight
@@ -78,7 +78,7 @@ def main ( mapFn ):
     BACKGROUND   = ( 0, 0, 0, FADE_RATE )
 
     #point defs
-    SIZE      = (1024,512)
+    SIZE      = (512,256)
     DOT1COLOR = (63,255,191)
     DOT2COLOR = (15,127,47)
     DOT3COLOR = (11,95,35)
@@ -125,7 +125,7 @@ def main ( mapFn ):
         count+=1
         if count % 1000 == 0:
             now = time.time()
-            print "%s per second" % (1000 / (now - lastTime),)
+#            print "%s per second" % (1000 / (now - lastTime),)
             lastTime = now
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -134,8 +134,8 @@ def main ( mapFn ):
                 print pygame.mouse.get_pos()
 
         word = struct.unpack( 'I', wordBytes )[0]
-
-        highWord = word >> 14
+        
+        highWord = word >> 16
         x, y = mapFn( highWord )
 
         oldHighCoords = highCoords
@@ -145,9 +145,9 @@ def main ( mapFn ):
             pygame.draw.line( image, LINECOLOR, highCoords, oldHighCoords )
             screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
 
-        lowWord  = word & ( 2 ** 18 - 1 )
+        lowWord  = word & ( 2 ** 16 - 1 )
         x, y = mapFn( lowWord )
-        x += 512
+        x += 256
 
         oldLowCoords = lowCoords
         lowCoords    = (x, y)
@@ -159,8 +159,9 @@ def main ( mapFn ):
         screen.blit( image, (0,0) )
         
         image.fill( BACKGROUND )
-
-        pygame.display.flip()
+        
+        if count % 10 == 0:
+            pygame.display.flip()
 
 
 if __name__ == "__main__":
