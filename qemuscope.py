@@ -93,6 +93,8 @@ def main ( mapFn ):
 
     pygame.init()
 
+    pygame.key.set_repeat( 500, 1 )
+
     screen = pygame.display.set_mode(SIZE,pygame.HWSURFACE|pygame.ASYNCBLIT)
     pygame.display.set_caption('YouScope XY-Demo Osciloscope Emulator')
 
@@ -112,6 +114,11 @@ def main ( mapFn ):
     dot.fill(DOT2COLOR, pygame.Rect(2,3,3,1))
     dot.fill(DOT1COLOR, pygame.Rect(3,3,1,1))
 
+    dot = pygame.Surface((2,2))
+    dot.set_alpha(DOTALPHA)
+    dot.fill(BGCOLOR)
+    dot.fill((0,255,0), pygame.Rect(0,0,2,2))
+
     stdin = os.fdopen( sys.stdin.fileno(), 'r', 0 )
     stdinIter = iter( lambda: stdin.read(4), '' )
     highCoords = None
@@ -120,6 +127,11 @@ def main ( mapFn ):
     count = 0
 
     lastTime = time.time()
+
+    zoomBits  = 0
+    zoomPos   = 0
+    zoomStart = 0
+    zoomEnd   = 0
 
     for wordBytes in stdinIter:
         count+=1
@@ -132,9 +144,51 @@ def main ( mapFn ):
                 sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 print pygame.mouse.get_pos()
+            elif event.type == pygame.KEYDOWN:
+                pressed = pygame.key.get_pressed()
+                if pressed[ pygame.K_UP ]:
+                    zoomPos += 1
+                elif pressed[ pygame.K_DOWN ]:
+                    zoomPos -= 1
+                elif pressed[ pygame.K_LEFT ]:
+                    zoomBits -= 1
+                    zoomPos << 1
+                elif pressed[ pygame.K_RIGHT ]:
+                    zoomBits += 1
+                    zoomPos >> 1
+
+                if zoomBits > 16:
+                    zoomBits = 16
+                elif zoomBits < 0:
+                    zoomBits = 0
+                
+                maxPos = (2 ** zoomBits) - 1
+
+                if zoomPos > maxPos:
+                    zoomPos = maxPos
+                elif zoomPos < 0:
+                    zoomPos = 0
+
+                zoomStart   = zoomPos << ( 32 - zoomBits )
+                zoomEnd     = zoomStart + (2 ** (32 - zoomBits) )
+                zoomStart16 = zoomPos << (16 - zoomBits)
+                zoomEnd16   = zoomStart16 + (2 ** (16 - zoomBits)) - 1
+
+                zoomBoxStartX, zoomBoxStartY = mapFn(zoomStart16)
+                zoomBoxEndX, zoomBoxEndY     = mapFn(zoomEnd16)
+                zoomBoxWidth                 = zoomBoxEndX - zoomBoxStartX
+                zoomBoxHeight                = zoomBoxEndY - zoomBoxStartY
+                zoomBoxCoords                = ( zoomBoxStartX, zoomBoxStartY, zoomBoxWidth, zoomBoxHeight )
+
+                zoomPosBin = bin(zoomPos | 2**zoomBits)[-zoomBits:] if zoomBits else ""
+                print "[%s%s%s] zoom shows addresses %x through %x" % (
+                    zoomPosBin, "_"*16, "?"*(32-zoomBits-16),
+                    zoomStart, zoomEnd )
+                print "zoom:", zoomStart16, zoomEnd16, zoomBoxCoords
+                image.fill( (0,255,0), pygame.Rect( *zoomBoxCoords ) )
 
         word = struct.unpack( 'I', wordBytes )[0]
-        
+
         highWord = word >> 16
         x, y = mapFn( highWord )
 
@@ -145,21 +199,24 @@ def main ( mapFn ):
             pygame.draw.line( image, LINECOLOR, highCoords, oldHighCoords )
             screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
 
-        lowWord  = word & ( 2 ** 16 - 1 )
-        x, y = mapFn( lowWord )
-        x += 256
+        if zoomStart < word < zoomEnd:
+            lowWord = word & ( ( 2 ** 16 - 1 ) << (16 - zoomBits) )
+            lowWord = lowWord >> ( 16 - zoomBits )
 
-        oldLowCoords = lowCoords
-        lowCoords    = (x, y)
-        
-        if oldLowCoords != None:
-            pygame.draw.line( image, LINECOLOR, lowCoords, oldLowCoords )
-            screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
+            x, y = mapFn( lowWord )
+            x += 256
+
+            oldLowCoords = lowCoords
+            lowCoords    = (x, y)
+
+            if oldLowCoords != None:
+                pygame.draw.line( image, LINECOLOR, lowCoords, oldLowCoords )
+                screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
 
         screen.blit( image, (0,0) )
-        
+
         image.fill( BACKGROUND )
-        
+
         if count % 10 == 0:
             pygame.display.flip()
 
@@ -170,7 +227,7 @@ if __name__ == "__main__":
 
     except:
         print "usage: %s <%s>" % (
-            sys.argv[0], 
+            sys.argv[0],
             "|".join( k for k,v in globals().items() if v in MAPPINGS )
             )
     else:
