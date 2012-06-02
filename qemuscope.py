@@ -74,7 +74,7 @@ def hilbert( t, n=128 ):
 def main ( mapFn ):
     #line defs
     FADE_RATE    = 1
-    LINECOLOR    = ( 0, 255, 0, 10 )
+    LINECOLOR    = ( 0, 255, 0, 100 )
     BACKGROUND   = ( 0, 0, 0, FADE_RATE )
 
     #point defs
@@ -96,6 +96,7 @@ def main ( mapFn ):
     pygame.key.set_repeat( 500, 1 )
 
     screen = pygame.display.set_mode(SIZE,pygame.HWSURFACE|pygame.ASYNCBLIT)
+#    screen = pygame.display.set_mode((0,0),pygame.FULLSCREEN)
     pygame.display.set_caption('YouScope XY-Demo Osciloscope Emulator')
 
     image = pygame.Surface( SIZE, pygame.SRCALPHA )
@@ -114,10 +115,10 @@ def main ( mapFn ):
     dot.fill(DOT2COLOR, pygame.Rect(2,3,3,1))
     dot.fill(DOT1COLOR, pygame.Rect(3,3,1,1))
 
-    dot = pygame.Surface((2,2))
-    dot.set_alpha(DOTALPHA)
-    dot.fill(BGCOLOR)
-    dot.fill((0,255,0), pygame.Rect(0,0,2,2))
+#    dot = pygame.Surface((1,1))
+#    dot.set_alpha(DOTALPHA)
+#    dot.fill(BGCOLOR)
+#    dot.fill((0,255,0), pygame.Rect(0,0,1,1))
 
     stdin = os.fdopen( sys.stdin.fileno(), 'r', 0 )
     stdinIter = iter( lambda: stdin.read(4), '' )
@@ -140,7 +141,8 @@ def main ( mapFn ):
 #            print "%s per second" % (1000 / (now - lastTime),)
             lastTime = now
         for event in pygame.event.get():
-            if event.type == pygame.QUIT:
+            if event.type in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
+                #os.kill(os.getpid(), 9)
                 sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 print pygame.mouse.get_pos()
@@ -152,10 +154,10 @@ def main ( mapFn ):
                     zoomPos -= 1
                 elif pressed[ pygame.K_LEFT ]:
                     zoomBits -= 1
-                    zoomPos << 1
+#                    zoomPos << 1
                 elif pressed[ pygame.K_RIGHT ]:
                     zoomBits += 1
-                    zoomPos >> 1
+#                    zoomPos >> 1
 
                 if zoomBits > 16:
                     zoomBits = 16
@@ -186,6 +188,8 @@ def main ( mapFn ):
                     zoomStart, zoomEnd )
                 print "zoom:", zoomStart16, zoomEnd16, zoomBoxCoords
                 image.fill( (0,255,0), pygame.Rect( *zoomBoxCoords ) )
+
+#        sys.stderr.write(wordBytes)
 
         word = struct.unpack( 'I', wordBytes )[0]
 
