@@ -141,7 +141,8 @@ def main ( mapFn ):
 #            print "%s per second" % (1000 / (now - lastTime),)
             lastTime = now
         for event in pygame.event.get():
-            if event.type in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
+#            if event.type in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
+            if event.type in [pygame.QUIT]:
                 #os.kill(os.getpid(), 9)
                 sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -154,10 +155,10 @@ def main ( mapFn ):
                     zoomPos -= 1
                 elif pressed[ pygame.K_LEFT ]:
                     zoomBits -= 1
-#                    zoomPos << 1
+                    zoomPos >>= 1
                 elif pressed[ pygame.K_RIGHT ]:
                     zoomBits += 1
-#                    zoomPos >> 1
+                    zoomPos <<= 1
 
                 if zoomBits > 16:
                     zoomBits = 16
