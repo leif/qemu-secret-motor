@@ -48,7 +48,7 @@ def block ( word, reverse = False, bits = 16 ):
     columns = 32
     assert columns * blockWidth * blockHeight * ( (2**(bits/2)) / blockHeight ) == 2**bits
     if reverse:
-        x, y = word
+        x, y   = word
         column = x / blockWidth
         row    = y / blockHeight
         blockX = x % blockWidth
@@ -56,12 +56,11 @@ def block ( word, reverse = False, bits = 16 ):
         blockN = column + row * columns
         return blockN * blockWidth * blockHeight + blockY * blockWidth + blockX
     else:
-        value = word & (2 ** 16 - 1)
-        blockN = value / blockWidth / blockHeight
+        blockN = word / blockWidth / blockHeight
         column = blockN % columns
         row    = blockN / columns
-        blockX = value % blockWidth
-        blockY = value / blockWidth % blockHeight
+        blockX = word % blockWidth
+        blockY = word / blockWidth % blockHeight
         x      = blockX + (blockWidth * column)
         y      = blockY + (blockHeight * row)
         return x, y
