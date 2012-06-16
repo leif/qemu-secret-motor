@@ -31,24 +31,33 @@ def appendTo ( target ):
     return decorator
 
 @appendTo( MAPPINGS )
-def linear ( word ):
-    x = word & 255
-    y = (word >> 8) & 255
-    return x, y
+def linear ( word, reverse = False ):
+    if reverse:
+        x, y = word
+        return (y << 8) + x
+    else:   
+        x = word & 255
+        y = (word >> 8) & 255
+        return x, y
 
 @appendTo( MAPPINGS )
-def block ( word ):
-    value = word & (2 ** 16 - 1)
-    colWidth, colHeight = 16, 16
-    columns = 16
-    colX = value % colWidth
-    colY = value / colWidth
-    colN = colY / colHeight
-    colXX = colN % columns
-    colYY = colN / columns
-    X = colX + (colWidth * colXX)
-    Y = colY % colHeight + (colHeight * colYY)
-    return X, Y
+def block ( word, reverse = False ):
+    if reverse:
+        x, y = word
+        raise NotImplemented
+        
+    else:
+        value = word & (2 ** 16 - 1)
+        colWidth, colHeight = 16, 16
+        columns = 16
+        colX = value % colWidth
+        colY = value / colWidth
+        colN = colY / colHeight
+        colXX = colN % columns
+        colYY = colN / columns
+        X = colX + (colWidth * colXX)
+        Y = colY % colHeight + (colHeight * colYY)
+        return X, Y
 
 @appendTo( MAPPINGS )
 def hilbert( t, n=128 ):
@@ -142,11 +151,16 @@ def main ( mapFn ):
             lastTime = now
         for event in pygame.event.get():
 #            if event.type in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
+            adjusted = False
             if event.type in [pygame.QUIT]:
                 #os.kill(os.getpid(), 9)
                 sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
-                print pygame.mouse.get_pos()
+                x,y = pygame.mouse.get_pos()
+                if x < 256:
+                    click1d = mapFn( (x,y), reverse = True ) << 16
+                    zoomPos = click1d >> ( 32 - zoomBits )
+                    adjusted = True
             elif event.type == pygame.KEYDOWN:
                 pressed = pygame.key.get_pressed()
                 if pressed[ pygame.K_UP ]:
@@ -172,6 +186,9 @@ def main ( mapFn ):
                 elif zoomPos < 0:
                     zoomPos = 0
 
+                adjusted = True
+            
+            if adjusted:
                 zoomStart   = zoomPos << ( 32 - zoomBits )
                 zoomEnd     = zoomStart + (2 ** (32 - zoomBits) )
                 zoomStart16 = zoomPos << (16 - zoomBits)
