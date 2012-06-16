@@ -42,25 +42,29 @@ def linear ( word, reverse = False ):
 
 @appendTo( MAPPINGS )
 def block ( word, reverse = False, bits = 16 ):
-    blockWidth, blockHeight = 16, 16
-    columns = 16
-    blockWidth, blockHeight = 8, 128
+#    blockWidth, blockHeight = 16, 16
+#    columns = 16
+    blockWidth, blockHeight = 8, 16
     columns = 32
     assert columns * blockWidth * blockHeight * ( (2**(bits/2)) / blockHeight ) == 2**bits
     if reverse:
         x, y = word
-        rowN = y / blockHeight
-        
+        column = x / blockWidth
+        row    = y / blockHeight
+        blockX = x % blockWidth
+        blockY = y % blockHeight
+        blockN = column + row * columns
+        return blockN * blockWidth * blockHeight + blockY * blockWidth + blockX
     else:
         value = word & (2 ** 16 - 1)
         blockN = value / blockWidth / blockHeight
-        blockX = blockN % columns
-        blockY = blockN / columns
-        localX = value % blockWidth
-        localY = value / blockWidth % blockHeight
-        X = localX + (blockWidth * blockX)
-        Y = localY + (blockHeight * blockY)
-        return X, Y
+        column = blockN % columns
+        row    = blockN / columns
+        blockX = value % blockWidth
+        blockY = value / blockWidth % blockHeight
+        x      = blockX + (blockWidth * column)
+        y      = blockY + (blockHeight * row)
+        return x, y
 
 @appendTo( MAPPINGS )
 def hilbert( t, n=128 ):
@@ -153,9 +157,9 @@ def main ( mapFn ):
 #            print "%s per second" % (1000 / (now - lastTime),)
             lastTime = now
         for event in pygame.event.get():
-#            if event.type in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
             adjusted = False
             if event.type in [pygame.QUIT]:
+#           if event.type in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
                 #os.kill(os.getpid(), 9)
                 sys.exit()
             elif event.type == pygame.MOUSEBUTTONDOWN:
@@ -207,7 +211,6 @@ def main ( mapFn ):
                 print "[%s%s%s] zoom shows addresses %x through %x" % (
                     zoomPosBin, "_"*16, "?"*(32-zoomBits-16),
                     zoomStart, zoomEnd )
-                print "zoom:", zoomStart16, zoomEnd16, zoomBoxCoords
                 image.fill( (0,255,0), pygame.Rect( *zoomBoxCoords ) )
 
 #        sys.stderr.write(wordBytes)
