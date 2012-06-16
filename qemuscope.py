@@ -42,49 +42,49 @@ def linear ( word, reverse = False ):
 
 @appendTo( MAPPINGS )
 def block ( word, reverse = False, bits = 16 ):
-#    blockWidth, blockHeight = 16, 16
+#    blockW, blockH = 16, 16
 #    columns = 16
-    blockWidth, blockHeight = 8, 16
+    blockW, blockH = 8, 16
     columns = 32
-    assert columns * blockWidth * blockHeight * ( (2**(bits/2)) / blockHeight ) == 2**bits
+    assert columns * blockW * blockH * ( (2**(bits/2)) / blockH ) == 2**bits
     if reverse:
         x, y   = word
-        column = x / blockWidth
-        row    = y / blockHeight
-        blockX = x % blockWidth
-        blockY = y % blockHeight
+        column = x / blockW
+        row    = y / blockH
+        blockX = x % blockW
+        blockY = y % blockH
         blockN = column + row * columns
-        return blockN * blockWidth * blockHeight + blockY * blockWidth + blockX
+        return blockN * blockW * blockH + blockY * blockW + blockX
     else:
-        blockN = word / blockWidth / blockHeight
+        blockN = word / blockW / blockH
         column = blockN % columns
         row    = blockN / columns
-        blockX = word % blockWidth
-        blockY = word / blockWidth % blockHeight
-        x      = blockX + (blockWidth * column)
-        y      = blockY + (blockHeight * row)
+        blockX = word % blockW
+        blockY = word / blockW % blockH
+        x      = blockX + blockW * column
+        y      = blockY + blockH * row
         return x, y
 
 @appendTo( MAPPINGS )
-def hilbert( t, n=128 ):
+def hilbert( t, n=256 ):
     """
     Attempt at porting C code from wikipedia. Doesn't work right.
     """
     x = y = 0
     s = 1
     while s<n:
-        s*=2
         rx = 1 & (t/2)
         ry = 1 & (t ^ rx)
         if ry == 0:
             if rx == 1:
-                x = n-1 - x
-                y = n-1 - y
+                x = s-1 - x
+                y = s-1 - y
             x, y = y, x
         x += s * rx
         y += s * ry
         t /= 4
-    return 4*x, 4*y
+        s*=2
+    return x, (256 - y)
 
 def main ( mapFn ):
     #line defs
