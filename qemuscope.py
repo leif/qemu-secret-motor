@@ -41,22 +41,25 @@ def linear ( word, reverse = False ):
         return x, y
 
 @appendTo( MAPPINGS )
-def block ( word, reverse = False ):
+def block ( word, reverse = False, bits = 16 ):
+    blockWidth, blockHeight = 16, 16
+    columns = 16
+    blockWidth, blockHeight = 8, 128
+    columns = 32
+    assert columns * blockWidth * blockHeight * ( (2**(bits/2)) / blockHeight ) == 2**bits
     if reverse:
         x, y = word
-        raise NotImplemented
+        rowN = y / blockHeight
         
     else:
         value = word & (2 ** 16 - 1)
-        colWidth, colHeight = 16, 16
-        columns = 16
-        colX = value % colWidth
-        colY = value / colWidth
-        colN = colY / colHeight
-        colXX = colN % columns
-        colYY = colN / columns
-        X = colX + (colWidth * colXX)
-        Y = colY % colHeight + (colHeight * colYY)
+        blockN = value / blockWidth / blockHeight
+        blockX = blockN % columns
+        blockY = blockN / columns
+        localX = value % blockWidth
+        localY = value / blockWidth % blockHeight
+        X = localX + (blockWidth * blockX)
+        Y = localY + (blockHeight * blockY)
         return X, Y
 
 @appendTo( MAPPINGS )
