@@ -84,7 +84,7 @@ def hilbert( t, n=256 ):
         y += s * ry
         t /= 4
         s*=2
-    return x, (256 - y)
+    return x,  y
 
 def main ( mapFn ):
     #line defs
@@ -210,7 +210,13 @@ def main ( mapFn ):
                 print "[%s%s%s] zoom shows addresses %x through %x" % (
                     zoomPosBin, "_"*16, "?"*(32-zoomBits-16),
                     zoomStart, zoomEnd )
-                image.fill( (0,255,0), pygame.Rect( *zoomBoxCoords ) )
+                print zoomStart16, zoomEnd16, zoomBoxCoords
+#                image.fill( (0,255,0), pygame.Rect( *zoomBoxCoords ) )
+                prevPoint = zoomStart16
+                for point in range( zoomStart16, zoomEnd16, 4 ):
+                    pygame.draw.line( image, LINECOLOR, mapFn(prevPoint) , mapFn(point) )
+                    prevPoint = point
+                    screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
 
 #        sys.stderr.write(wordBytes)
 
