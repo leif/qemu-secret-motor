@@ -113,7 +113,7 @@ def hilbert( inBits, outBits, value, reverse = False ):
             s*=2
         return x,  y
 
-def main ( mapFn ):
+def main ( mapFn = linear ):
     #line defs
     FADE_RATE    = 1
     LINECOLOR    = ( 0, 255, 0, 100 )
@@ -212,6 +212,12 @@ def main ( mapFn ):
                     windowSize -= 1
                 elif pressed[ pygame.K_PERIOD ]:
                     windowSize += 1
+                elif pressed[ pygame.K_h ]:
+                    mapFn = hilbert
+                elif pressed[ pygame.K_l ]:
+                    mapFn = linear
+                elif pressed[ pygame.K_b ]:
+                    mapFn = block
 
                 if windowSize > wordSize:
                     windowSize = wordSize
@@ -295,14 +301,8 @@ def main ( mapFn ):
 
 
 if __name__ == "__main__":
-    try:
-        mapFn = globals()[ sys.argv[1] ]
-
-    except:
-        print "usage: %s <%s>" % (
-            sys.argv[0],
-            "|".join( k for k,v in globals().items() if v in MAPPINGS )
-            )
+    if len( sys.argv ) == 1:
+        main( )
     else:
-        main( mapFn )
+        print "how to use: pipe a stream of 32-bit unsigned ints in to this"
 
