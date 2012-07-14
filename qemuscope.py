@@ -1,18 +1,17 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# Youscope Emulator
+# qemuscope
 #
-#(c)2007 Felipe Sanches
-#(c)2007 Leandro Lameiro
-#licensed under GNU GPL v3 or later
-
-# A bunch of bug fixes and enhancements
-# Michael Sparmann, 2009
-
-# Complete rewrite to plot memory adresses from qemu
-# (C) 2011 Leif Ryge
-# (C) 2011 Rodrigo R. Silva
+# (c) 2012 Leif Ryge
+# (c) 2012 Michael Kan
+# (c) 2011 Rodrigo R. Silva
+#
+# based on Youscope Emulator
+# (c) 2007 Felipe Sanches
+# (c) 2007 Leandro Lameiro
+# (c) 2009 Michael Sparmann
+# licensed under GNU GPL v3 or later
 
 import struct
 import pygame
@@ -21,23 +20,25 @@ import sys
 import math
 import time
 
-
-MAPPINGS = []
-
-def appendTo ( target ):
-    def decorator ( fn ):
-        target.append( fn )
-        return fn
-    return decorator
-
 def scale ( inBits, outBits, value ):
+    """
+    >>> scale( 8, 1, 255 )
+    1
+    >>> scale( 1, 8, 1 )
+    128
+    """
     if inBits > outBits:
         return value >> (inBits - outBits)
     else:
         return value << (outBits - inBits)
 
-@appendTo( MAPPINGS )
 def linear ( inBits, outBits, value, reverse = False ):
+    """
+    >>> linear( 32, 16, 255 << 16 )
+    (255, 0)
+    >>> linear( 32, 16, 256 << 16 )
+    (0, 1)
+    """
     assert outBits % 2 == 0
     half = outBits / 2
     if reverse:
@@ -49,7 +50,6 @@ def linear ( inBits, outBits, value, reverse = False ):
         y = (word >> half) & (2**half - 1)
         return x, y
 
-@appendTo( MAPPINGS )
 def block ( inBits, outBits, value, reverse = False, (blockW, blockH) = (16,16) ):
     assert outBits % 2 == 0, "output range must be even"
     columns = (2 ** (outBits/2) ) / outBits
@@ -74,7 +74,6 @@ def block ( inBits, outBits, value, reverse = False, (blockW, blockH) = (16,16) 
         y      = blockY + blockH * row
         return x, y
 
-@appendTo( MAPPINGS )
 def hilbert( inBits, outBits, value, reverse = False ):
     """
     Port of C code from en.wikipedia.org/wiki/Hilbert_curve
@@ -163,7 +162,7 @@ def main ( mapFn = linear ):
 #    dot.fill((0,255,0), pygame.Rect(0,0,1,1))
 
     stdin = os.fdopen( sys.stdin.fileno(), 'r', 0 )
-    stdinIter = iter( lambda: stdin.read(4), '' )
+    stdinIter  = iter( lambda: stdin.read(4), '' )
     highCoords = None
     lowCoords  = None
 
@@ -244,21 +243,10 @@ def main ( mapFn = linear ):
                 droppedBits = maxZoomBits - zoomBits
                 zoomStart   = zoomPos << ( wordSize - zoomBits )
                 zoomEnd     = zoomStart + (2 ** (wordSize - zoomBits) )
-#                zoomStart16 = zoomPos << droppedBits
-#                zoomEnd16   = zoomStart16 + (2 ** droppedBits ) - 1
-
-#                zoomBoxStartX, zoomBoxStartY = mapFn(windowSize, 16, zoomStart16, False)
-#                zoomBoxEndX, zoomBoxEndY     = mapFn(windowSize, 16, zoomEnd16, False)
-#                zoomBoxWidth                 = zoomBoxEndX - zoomBoxStartX
-#                zoomBoxHeight                = zoomBoxEndY - zoomBoxStartY
-#                zoomBoxCoords                = ( zoomBoxStartX, zoomBoxStartY, zoomBoxWidth, zoomBoxHeight )
-
-                zoomPosBin = bin(zoomPos | 2**zoomBits)[-zoomBits:] if zoomBits else ""
+                zoomPosBin  = bin(zoomPos | 2**zoomBits)[-zoomBits:] if zoomBits else ""
                 print "[%s%s%s] address range %x - %x (%s bits)" % (
                     zoomPosBin, "_"*windowSize, "?"*(droppedBits),
                     zoomStart, zoomEnd-1, windowSize )
-#                print zoomStart16, zoomEnd16, zoomBoxCoords
-#                image.fill( (0,255,0), pygame.Rect( *zoomBoxCoords ) )
                 prevPoint = zoomStart
                 for point in range( zoomStart, zoomEnd,  (2**16)*4):
                     pygame.draw.line( image, LINECOLOR, mapFn( wordSize, 16, prevPoint, False) , mapFn( wordSize, 16, point, False ) )
