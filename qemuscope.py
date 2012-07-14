@@ -30,32 +30,41 @@ def appendTo ( target ):
         return fn
     return decorator
 
+def scale ( inBits, outBits, value ):
+    if inBits > outBits:
+        return value >> (inBits - outBits)
+    else:
+        return value << (outBits - inBits)
+
 @appendTo( MAPPINGS )
-def linear ( word, reverse = False ):
+def linear ( inBits, outBits, value, reverse = False ):
+    assert outBits % 2 == 0
+    half = outBits / 2
     if reverse:
-        x, y = word
-        return (y << 8) + x
+        x, y = value
+        return scale( outBits, inBits, (y << half) + x )
     else:   
+        word = scale( inBits, outBits, value )
         x = word & 255
-        y = (word >> 8) & 255
+        y = (word >> half) & (2**half - 1)
         return x, y
 
 @appendTo( MAPPINGS )
-def block ( word, reverse = False, bits = 16 ):
-#    blockW, blockH = 16, 16
-#    columns = 16
-    blockW, blockH = 8, 16
-    columns = 32
-    assert columns * blockW * blockH * ( (2**(bits/2)) / blockH ) == 2**bits
+def block ( inBits, outBits, value, reverse = False, (blockW, blockH) = (16,16) ):
+    assert outBits % 2 == 0, "output range must be even"
+    columns = (2 ** (outBits/2) ) / outBits
+    assert columns * blockW * blockH * ( (2**(outBits/2)) / blockH ) == 2**outBits, (blockW,blockH,columns)
+    assert (columns**2) * blockW * blockH == 2**outBits, (blockW,blockH,columns)
     if reverse:
-        x, y   = word
+        x, y   = value
         column = x / blockW
         row    = y / blockH
         blockX = x % blockW
         blockY = y % blockH
         blockN = column + row * columns
-        return blockN * blockW * blockH + blockY * blockW + blockX
+        return scale( outBits, inBits, blockN * blockW * blockH + blockY * blockW + blockX )
     else:
+        word   = scale( inBits, outBits, value )
         blockN = word / blockW / blockH
         column = blockN % columns
         row    = blockN / columns
@@ -66,25 +75,43 @@ def block ( word, reverse = False, bits = 16 ):
         return x, y
 
 @appendTo( MAPPINGS )
-def hilbert( t, n=256 ):
+def hilbert( inBits, outBits, value, reverse = False ):
     """
-    Attempt at porting C code from wikipedia. Doesn't work right.
+    Port of C code from en.wikipedia.org/wiki/Hilbert_curve
     """
-    x = y = 0
-    s = 1
-    while s<n:
-        rx = 1 & (t/2)
-        ry = 1 & (t ^ rx)
-        if ry == 0:
-            if rx == 1:
-                x = s-1 - x
-                y = s-1 - y
-            x, y = y, x
-        x += s * rx
-        y += s * ry
-        t /= 4
-        s*=2
-    return x,  y
+    n = outBits ** 2
+    if reverse:
+        x,y = value
+        d = 0
+        s = n/2
+        while s > 0:
+            rx = (x & s) > 0
+            ry = (y & s) > 0
+            d += s * s * ((3 * rx) ^ ry)
+            if ry == 0:
+                if rx == 1:
+                    x = s - 1 - x
+                    y = s - 1 - y
+                x, y = y, x
+            s /= 2
+        return scale( outBits, inBits, d )
+    else:
+        t = scale( inBits, outBits, value )
+        x = y = 0
+        s = 1
+        while s<n:
+            rx = 1 & (t/2)
+            ry = 1 & (t ^ rx)
+            if ry == 0:
+                if rx == 1:
+                    x = s-1 - x
+                    y = s-1 - y
+                x, y = y, x
+            x += s * rx
+            y += s * ry
+            t /= 4
+            s*=2
+        return x,  y
 
 def main ( mapFn ):
     #line defs
@@ -144,10 +171,12 @@ def main ( mapFn ):
 
     lastTime = time.time()
 
-    zoomBits  = 0
-    zoomPos   = 0
-    zoomStart = 0
-    zoomEnd   = 0
+    wordSize   = 32
+    windowSize = 16
+    zoomBits   = 0
+    zoomPos    = 0
+    zoomStart  = 0
+    zoomEnd    = 0
 
     for wordBytes in stdinIter:
         count+=1
@@ -164,8 +193,8 @@ def main ( mapFn ):
             elif event.type == pygame.MOUSEBUTTONDOWN:
                 x,y = pygame.mouse.get_pos()
                 if x < 256:
-                    click1d = mapFn( (x,y), reverse = True ) << 16
-                    zoomPos = click1d >> ( 32 - zoomBits )
+                    click1d = mapFn( wordSize, 16, (x,y), reverse = True )
+                    zoomPos = click1d >> ( wordSize - zoomBits )
                     adjusted = True
             elif event.type == pygame.KEYDOWN:
                 pressed = pygame.key.get_pressed()
@@ -179,42 +208,54 @@ def main ( mapFn ):
                 elif pressed[ pygame.K_RIGHT ]:
                     zoomBits += 1
                     zoomPos <<= 1
+                elif pressed[ pygame.K_COMMA ]:
+                    windowSize -= 1
+                elif pressed[ pygame.K_PERIOD ]:
+                    windowSize += 1
 
-                if zoomBits > 16:
-                    zoomBits = 16
+                if windowSize > wordSize:
+                    windowSize = wordSize
+                elif windowSize < 1:
+                    windowSize = 1
+
+                maxZoomBits = wordSize - windowSize
+
+                if zoomBits > maxZoomBits:
+                    zoomBits = maxZoomBits
                 elif zoomBits < 0:
                     zoomBits = 0
                 
-                maxPos = (2 ** zoomBits) - 1
+                maxZoomPos = (2 ** zoomBits) - 1
 
-                if zoomPos > maxPos:
-                    zoomPos = maxPos
+                if zoomPos > maxZoomPos:
+                    zoomPos = maxZoomPos
                 elif zoomPos < 0:
                     zoomPos = 0
 
                 adjusted = True
             
             if adjusted:
-                zoomStart   = zoomPos << ( 32 - zoomBits )
-                zoomEnd     = zoomStart + (2 ** (32 - zoomBits) )
-                zoomStart16 = zoomPos << (16 - zoomBits)
-                zoomEnd16   = zoomStart16 + (2 ** (16 - zoomBits)) - 1
+                droppedBits = maxZoomBits - zoomBits
+                zoomStart   = zoomPos << ( wordSize - zoomBits )
+                zoomEnd     = zoomStart + (2 ** (wordSize - zoomBits) )
+#                zoomStart16 = zoomPos << droppedBits
+#                zoomEnd16   = zoomStart16 + (2 ** droppedBits ) - 1
 
-                zoomBoxStartX, zoomBoxStartY = mapFn(zoomStart16)
-                zoomBoxEndX, zoomBoxEndY     = mapFn(zoomEnd16)
-                zoomBoxWidth                 = zoomBoxEndX - zoomBoxStartX
-                zoomBoxHeight                = zoomBoxEndY - zoomBoxStartY
-                zoomBoxCoords                = ( zoomBoxStartX, zoomBoxStartY, zoomBoxWidth, zoomBoxHeight )
+#                zoomBoxStartX, zoomBoxStartY = mapFn(windowSize, 16, zoomStart16, False)
+#                zoomBoxEndX, zoomBoxEndY     = mapFn(windowSize, 16, zoomEnd16, False)
+#                zoomBoxWidth                 = zoomBoxEndX - zoomBoxStartX
+#                zoomBoxHeight                = zoomBoxEndY - zoomBoxStartY
+#                zoomBoxCoords                = ( zoomBoxStartX, zoomBoxStartY, zoomBoxWidth, zoomBoxHeight )
 
                 zoomPosBin = bin(zoomPos | 2**zoomBits)[-zoomBits:] if zoomBits else ""
-                print "[%s%s%s] zoom shows addresses %x through %x" % (
-                    zoomPosBin, "_"*16, "?"*(32-zoomBits-16),
-                    zoomStart, zoomEnd )
-                print zoomStart16, zoomEnd16, zoomBoxCoords
+                print "[%s%s%s] address range %x - %x (%s bits)" % (
+                    zoomPosBin, "_"*windowSize, "?"*(droppedBits),
+                    zoomStart, zoomEnd-1, windowSize )
+#                print zoomStart16, zoomEnd16, zoomBoxCoords
 #                image.fill( (0,255,0), pygame.Rect( *zoomBoxCoords ) )
-                prevPoint = zoomStart16
-                for point in range( zoomStart16, zoomEnd16, 4 ):
-                    pygame.draw.line( image, LINECOLOR, mapFn(prevPoint) , mapFn(point) )
+                prevPoint = zoomStart
+                for point in range( zoomStart, zoomEnd,  (2**16)*4):
+                    pygame.draw.line( image, LINECOLOR, mapFn( wordSize, 16, prevPoint, False) , mapFn( wordSize, 16, point, False ) )
                     prevPoint = point
                     screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
 
@@ -222,8 +263,7 @@ def main ( mapFn ):
 
         word = struct.unpack( 'I', wordBytes )[0]
 
-        highWord = word >> 16
-        x, y = mapFn( highWord )
+        x, y = mapFn( inBits = wordSize, outBits = 16, value = word, reverse = False )
 
         oldHighCoords = highCoords
         highCoords    = (x, y)
@@ -233,10 +273,10 @@ def main ( mapFn ):
             screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
 
         if zoomStart < word < zoomEnd:
-            lowWord = word & ( ( 2 ** 16 - 1 ) << (16 - zoomBits) )
-            lowWord = lowWord >> ( 16 - zoomBits )
+            lowWord = word & ( ( 2 ** windowSize - 1 ) << (maxZoomBits - zoomBits) )
+            lowWord = lowWord >> ( maxZoomBits - zoomBits )
 
-            x, y = mapFn( lowWord )
+            x, y = mapFn( inBits = windowSize, outBits = 16, value = lowWord, reverse = False )
             x += 256
 
             oldLowCoords = lowCoords
