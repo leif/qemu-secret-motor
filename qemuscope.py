@@ -112,7 +112,7 @@ def hilbert( inBits, outBits, value, reverse = False ):
             s*=2
         return x,  y
 
-def main ( mapFn = linear ):
+def main ( fmtString="I", mapFn = linear ):
     #line defs
     FADE_RATE    = 1
     LINECOLOR    = ( 0, 255, 0, 100 )
@@ -161,8 +161,11 @@ def main ( mapFn = linear ):
 #    dot.fill(BGCOLOR)
 #    dot.fill((0,255,0), pygame.Rect(0,0,1,1))
 
+    wordSizeBytes = len(struct.pack( fmtString, 0 ))
+    wordSize      = wordSizeBytes * 8
+
     stdin = os.fdopen( sys.stdin.fileno(), 'r', 0 )
-    stdinIter  = iter( lambda: stdin.read(4), '' )
+    stdinIter  = iter( lambda: stdin.read( wordSizeBytes ), '' )
     highCoords = None
     lowCoords  = None
 
@@ -170,12 +173,12 @@ def main ( mapFn = linear ):
 
     lastTime = time.time()
 
-    wordSize   = 32
-    windowSize = 16
-    zoomBits   = 0
-    zoomPos    = 0
-    zoomStart  = 0
-    zoomEnd    = 0
+    windowSize  = 16
+    zoomBits    = 0
+    zoomPos     = 0
+    zoomStart   = 0
+    zoomEnd     = 0
+    maxZoomBits = wordSize - windowSize
 
     for wordBytes in stdinIter:
         count+=1
@@ -255,7 +258,7 @@ def main ( mapFn = linear ):
 
 #        sys.stderr.write(wordBytes)
 
-        word = struct.unpack( 'I', wordBytes )[0]
+        word = struct.unpack( fmtString, wordBytes )[0]
 
         x, y = mapFn( inBits = wordSize, outBits = 16, value = word, reverse = False )
 
@@ -289,8 +292,9 @@ def main ( mapFn = linear ):
 
 
 if __name__ == "__main__":
-    if len( sys.argv ) == 1:
-        main( )
+    if len( sys.argv ) <= 2:
+        main( *sys.argv[ 1: ] )
     else:
-        print "how to use: pipe a stream of 32-bit unsigned ints in to this"
+        print "usage: %s [fmtString]" % (os.path.basename(sys.argv[0]),)
+        print "(default is 'I', 32-bit unsigned int)"
 
