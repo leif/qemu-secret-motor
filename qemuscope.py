@@ -19,6 +19,7 @@ import os
 import sys
 import math
 import time
+from collections import deque
 
 def scale ( inBits, outBits, value ):
     """
@@ -179,15 +180,78 @@ def main ( fmtString="I", mapFn = linear ):
     zoomStart   = 0
     zoomEnd     = 0
     maxZoomBits = wordSize - windowSize
+    autoZoom    = False
+    history     = deque( maxlen = 100 )
 
     for wordBytes in stdinIter:
+        adjusted = False
         count+=1
         if count % 1000 == 0:
             now = time.time()
 #            print "%s per second" % (1000 / (now - lastTime),)
             lastTime = now
+
+#        sys.stderr.write(wordBytes)
+
+        word = struct.unpack( fmtString, wordBytes )[0]
+        x, y = mapFn( inBits = wordSize, outBits = 16, value = word, reverse = False )
+
+        oldHighCoords = highCoords
+        highCoords    = (x, y)
+
+        if oldHighCoords != None:
+            pygame.draw.line( image, LINECOLOR, highCoords, oldHighCoords )
+            screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
+
+        if zoomStart < word < zoomEnd:
+            lowWord = word & ( ( 2 ** windowSize - 1 ) << (maxZoomBits - zoomBits) )
+            lowWord = lowWord >> ( maxZoomBits - zoomBits )
+
+            x, y = mapFn( inBits = windowSize, outBits = 16, value = lowWord, reverse = False )
+            x += 256
+
+            oldLowCoords = lowCoords
+            lowCoords    = (x, y)
+
+            if oldLowCoords != None:
+                pygame.draw.line( image, LINECOLOR, lowCoords, oldLowCoords )
+                screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
+
+        screen.blit( image, (0,0) )
+
+        image.fill( BACKGROUND )
+
+        if count % 10 == 0:
+            pygame.display.flip()
+
+        autoZoomed = False
+
+        if autoZoom:
+            history.append( word )
+            minWord = min( history )
+            maxWord = max( history )
+            autoZoomRange = maxWord - minWord
+            if autoZoomRange > 0:
+                necessaryBits = 1 + int( math.ceil( math.log( autoZoomRange, 2 ) ) )
+                newZoomBits = wordSize - necessaryBits
+                windowSize = necessaryBits
+                if newZoomBits > maxZoomBits:
+                    newZoomBits = maxZoomBits
+                if newZoomBits < 0:
+                    newZoomBits = 0
+                newZoomPos  = ( minWord & ((2**newZoomBits-1)<<necessaryBits) ) >> necessaryBits
+                if newZoomBits < 0:
+                    newZoomBits = 0
+                if newZoomBits != zoomBits:
+                    autoZoomed = True
+                    zoomBits = newZoomBits
+                if newZoomPos != zoomPos:
+                    autoZoomed = True
+                    zoomPos = newZoomPos
+                if autoZoomed:
+                    print "min,max = %s,%s so autoZoomed to %s bits from %s" % (minWord,maxWord, zoomBits, zoomPos)
+
         for event in pygame.event.get():
-            adjusted = False
             if event.type in [pygame.QUIT]:
 #           if event.type in [pygame.QUIT, pygame.MOUSEBUTTONDOWN]:
                 #os.kill(os.getpid(), 9)
@@ -199,8 +263,15 @@ def main ( fmtString="I", mapFn = linear ):
                     zoomPos = click1d >> ( wordSize - zoomBits )
                     adjusted = True
             elif event.type == pygame.KEYDOWN:
+                adjusted = True
                 pressed = pygame.key.get_pressed()
-                if pressed[ pygame.K_UP ]:
+                if pressed[ pygame.K_q ]:
+                    sys.exit()
+                elif pressed[ pygame.K_a ]:
+                    autoZoom = not autoZoom
+                    print "autoZoom = %s" % (autoZoom,)
+                    adjusted = False
+                elif pressed[ pygame.K_UP ]:
                     zoomPos += 1
                 elif pressed[ pygame.K_DOWN ]:
                     zoomPos -= 1
@@ -240,55 +311,19 @@ def main ( fmtString="I", mapFn = linear ):
                 elif zoomPos < 0:
                     zoomPos = 0
 
-                adjusted = True
-            
-            if adjusted:
-                droppedBits = maxZoomBits - zoomBits
-                zoomStart   = zoomPos << ( wordSize - zoomBits )
-                zoomEnd     = zoomStart + (2 ** (wordSize - zoomBits) )
-                zoomPosBin  = bin(zoomPos | 2**zoomBits)[-zoomBits:] if zoomBits else ""
-                print "[%s%s%s] address range %x - %x (%s bits)" % (
-                    zoomPosBin, "_"*windowSize, "?"*(droppedBits),
-                    zoomStart, zoomEnd-1, windowSize )
-                prevPoint = zoomStart
-                for point in range( zoomStart, zoomEnd,  (2**16)*4):
-                    pygame.draw.line( image, LINECOLOR, mapFn( wordSize, 16, prevPoint, False) , mapFn( wordSize, 16, point, False ) )
-                    prevPoint = point
-                    screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
-
-#        sys.stderr.write(wordBytes)
-
-        word = struct.unpack( fmtString, wordBytes )[0]
-
-        x, y = mapFn( inBits = wordSize, outBits = 16, value = word, reverse = False )
-
-        oldHighCoords = highCoords
-        highCoords    = (x, y)
-
-        if oldHighCoords != None:
-            pygame.draw.line( image, LINECOLOR, highCoords, oldHighCoords )
-            screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
-
-        if zoomStart < word < zoomEnd:
-            lowWord = word & ( ( 2 ** windowSize - 1 ) << (maxZoomBits - zoomBits) )
-            lowWord = lowWord >> ( maxZoomBits - zoomBits )
-
-            x, y = mapFn( inBits = windowSize, outBits = 16, value = lowWord, reverse = False )
-            x += 256
-
-            oldLowCoords = lowCoords
-            lowCoords    = (x, y)
-
-            if oldLowCoords != None:
-                pygame.draw.line( image, LINECOLOR, lowCoords, oldLowCoords )
+        if adjusted or autoZoomed:
+            droppedBits = maxZoomBits - zoomBits
+            zoomStart   = zoomPos << ( wordSize - zoomBits )
+            zoomEnd     = zoomStart + (2 ** (wordSize - zoomBits) )
+            zoomPosBin  = bin(zoomPos | 2**zoomBits)[-zoomBits:] if zoomBits else ""
+            print "[%s%s%s] address range %x - %x (%s bits)" % (
+                zoomPosBin, "_"*windowSize, "?"*(droppedBits),
+                zoomStart, zoomEnd-1, windowSize )
+            prevPoint = zoomStart
+            for point in range( zoomStart, zoomEnd,  (2**16)*4):
+                pygame.draw.line( image, LINECOLOR, mapFn( wordSize, 16, prevPoint, False) , mapFn( wordSize, 16, point, False ) )
+                prevPoint = point
                 screen.blit(dot, (x-3,y-3), None, pygame.BLEND_ADD)
-
-        screen.blit( image, (0,0) )
-
-        image.fill( BACKGROUND )
-
-        if count % 10 == 0:
-            pygame.display.flip()
 
 
 if __name__ == "__main__":
