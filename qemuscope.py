@@ -113,7 +113,10 @@ def hilbert( inBits, outBits, value, reverse = False ):
             s*=2
         return x,  y
 
-def main ( fmtString="I", mapFn = linear ):
+def main ( spec="R >H" ):
+
+    mapFn = linear
+
     #line defs
     FADE_RATE    = 1
     LINECOLOR    = ( 0, 255, 0, 100 )
@@ -162,11 +165,14 @@ def main ( fmtString="I", mapFn = linear ):
 #    dot.fill(BGCOLOR)
 #    dot.fill((0,255,0), pygame.Rect(0,0,1,1))
 
+
+    prefix, fmtString = spec.split()
+
     wordSizeBytes = len(struct.pack( fmtString, 0 ))
     wordSize      = wordSizeBytes * 8
 
-    stdin = os.fdopen( sys.stdin.fileno(), 'r', 0 )
-    stdinIter  = iter( lambda: stdin.read( wordSizeBytes ), '' )
+#    stdin = os.fdopen( sys.stdin.fileno(), 'r', 0 )
+#    stdinIter  = iter( lambda: stdin.read( wordSizeBytes ), '' )
     highCoords = None
     lowCoords  = None
 
@@ -183,7 +189,12 @@ def main ( fmtString="I", mapFn = linear ):
     autoZoom    = False
     history     = deque( maxlen = 100 )
 
-    for wordBytes in stdinIter:
+#    for wordBytes in stdinIter:
+    for line in sys.stdin:
+        linePrefix, value = line.split()
+        if linePrefix != prefix:
+            continue
+        wordBytes = value.decode('hex')
         adjusted = False
         count+=1
         if count % 1000 == 0:
@@ -227,6 +238,7 @@ def main ( fmtString="I", mapFn = linear ):
         autoZoomed = False
 
         if autoZoom:
+            # note: autozoom does not actually work right yet.
             history.append( word )
             minWord = min( history )
             maxWord = max( history )
@@ -330,6 +342,5 @@ if __name__ == "__main__":
     if len( sys.argv ) <= 2:
         main( *sys.argv[ 1: ] )
     else:
-        print "usage: %s [fmtString]" % (os.path.basename(sys.argv[0]),)
-        print "(default is 'I', 32-bit unsigned int)"
+        print "usage: %s [field_specifiers]" % (os.path.basename(sys.argv[0]),)
 
